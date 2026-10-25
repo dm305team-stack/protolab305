@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side"><main>
+  <p class="crumbs"><a href="dashboard.html" id="cr"></a> / <span id="d"></span></p>
+  <h1 id="h"></h1>
+  <table><thead><tr><th id="a1"></th><th id="a2"></th><th class="hide-s" id="a3"></th><th class="hide-s" id="a4"></th><th id="a5"></th></tr></thead><tbody id="rows"></tbody></table>
+  <p class="note" id="sp"></p>
+</main>
+<script src="app.js"></script>
+<script>
+guard(); shell("attendance");
+const set = (id, k) => { document.getElementById(id).textContent = t(k); };
+set("cr","attendance"); set("a1","patient"); set("a2","present"); set("a3","inT"); set("a4","out"); set("a5","followUp"); set("sp","samplePatients");
+const d = new URLSearchParams(location.search).get("d") || iso(TODAY);
+document.getElementById("d").textContent = d; document.getElementById("h").textContent = t("sampleHouse") + ", " + d;
+const [y, m] = d.split("-").map(Number);
+const rows = monthRecords(y, m - 1).filter((r) => r.date === d);
+document.getElementById("rows").innerHTML = rows.length ? rows.map((r) =>
+  `<tr><td>${r.patient}</td><td class="${r.present ? "yes" : "no"}">${r.present ? t("yes") : t("no")}</td><td class="hide-s">${r.timeIn || "-"}</td><td class="hide-s">${r.timeOut || "-"}</td><td>${r.followUp ? t("required") : "-"}</td></tr>`).join("")
+  : `<tr><td colspan="5">${t("noRecords")}</td></tr>`;
+</script></body></html>

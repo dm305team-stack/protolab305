@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body><div class="banner" id="bn"></div>
+<main class="login">
+  <h1 id="h1"></h1>
+  <form id="pw">
+    <label for="u" id="lu"></label><input id="u" autocomplete="off" value="supervisor@example.com">
+    <label for="p" id="lp"></label><input id="p" type="password" autocomplete="off" value="demo-password">
+    <button type="submit" id="bc"></button>
+  </form>
+  <form id="code" hidden>
+    <p id="ci"></p>
+    <label for="c" id="lc"></label><input id="c" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="123456">
+    <button type="submit" id="bs"></button>
+  </form>
+  <p class="note" id="ln"></p>
+  <p class="note"><a href="#" id="sw"></a></p>
+</main>
+<script src="app.js"></script>
+<script>
+const set = (id, k) => { document.getElementById(id).textContent = t(k); };
+document.title = t("signIn") + " | Houses Demo";
+set("bn","banner"); set("h1","brand"); set("lu","username"); set("lp","password"); set("bc","cont"); set("ci","codeIntro"); set("lc","code"); set("bs","signIn"); set("ln","loginNote");
+document.getElementById("sw").textContent = LANG === "en" ? "Español" : "English";
+document.getElementById("sw").addEventListener("click", (e) => { e.preventDefault(); setLang(LANG === "en" ? "es" : "en"); });
+document.getElementById("pw").addEventListener("submit", (e) => { e.preventDefault(); e.target.hidden = true; document.getElementById("code").hidden = false; document.getElementById("c").focus(); });
+document.getElementById("code").addEventListener("submit", (e) => { e.preventDefault(); try { sessionStorage.setItem("demo-signed-in", "1"); } catch (err) {} location.href = "home.html"; });
+</script></body></html>

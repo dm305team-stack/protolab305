@@ -1,0 +1,135 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Home | Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side home"><main>
+  <span class="pill" id="pl"></span>
+  <h1 id="h1"></h1>
+  <section class="stats" >
+    <div class="tile"><div class="n" id="s-goals"></div><div class="l" id="l-goals"></div></div>
+    <div class="tile hot"><div class="n" id="s-lic"></div><div class="l" id="l-lic"></div></div>
+    <div class="tile"><div class="n" id="s-att"></div><div class="l" id="l-att"></div></div>
+    <div class="tile"><div class="n" id="s-fu"></div><div class="l" id="l-fu"></div></div>
+  </section>
+  <div class="chips">
+    <button type="button" class="chip" data-add="house" id="c-house"></button>
+    <button type="button" class="chip" data-add="staff" id="c-staff"></button>
+    <button type="button" class="chip" data-add="patient" id="c-patient"></button>
+  </div>
+  <p class="toast note" id="toast" role="status"></p>
+  <div class="houses" id="houses"></div>
+  <dialog id="dlg"><form method="dialog" id="df">
+    <h2 id="dt"></h2>
+    <label for="dn" id="dnl">Name</label><input id="dn" autocomplete="off" required maxlength="60">
+    <div id="hw"><label for="dh" id="ldh"></label><select id="dh"></select></div>
+    <p class="error-msg" id="de" role="alert"></p>
+    <div class="actions"><button type="button" class="secondary" id="dc"></button><button type="submit" id="ds"></button></div>
+  </form></dialog>
+  <section class="news" aria-labelledby="nt">
+    <h2 id="nt"></h2>
+    <ul class="news-list" id="news"></ul>
+  </section>
+  <section class="chat">
+    <h2 id="ct"></h2>
+    <div class="log" id="log" aria-live="polite"></div>
+    <form id="f">
+      <input id="q" autocomplete="off" ><button type="submit" id="sb"></button></form>
+  </section>
+</main>
+<script src="app.js"></script>
+<script>
+guard(); shell("home");
+const set = (id, k) => { document.getElementById(id).textContent = t(k); };
+set("pl","overview"); set("h1","glance"); set("l-goals","goals"); set("l-lic","licenses"); set("l-att","avgAtt"); set("l-fu","followUps");
+set("c-house","addHouse"); set("c-staff","addStaff"); set("c-patient","addPatient"); set("ldh","house"); set("dc","cancel"); set("ds","add"); set("nt","newsTitle"); set("ct","chatTitle"); set("sb","send");
+document.getElementById("q").placeholder = t("chatPh"); document.getElementById("q").setAttribute("aria-label", t("chatPh"));
+
+// Sample figures: goals and license dates are demo-only concepts.
+const STATS = { goalsDone: 18, goalsTotal: 24, licensesDue: 3 };
+function renderStats() {
+  const act = HOUSES.filter((h) => h.patients > 0);
+  document.getElementById("s-goals").textContent = `${STATS.goalsDone} / ${STATS.goalsTotal}`;
+  document.getElementById("s-lic").textContent = STATS.licensesDue;
+  document.getElementById("s-att").textContent = act.length ? Math.round(act.reduce((s, h) => s + h.attendance, 0) / act.length) + "%" : "-";
+  document.getElementById("s-fu").textContent = HOUSES.reduce((s, h) => s + h.followUps, 0);
+}
+function renderHouses() {
+renderStats();
+document.getElementById("houses").innerHTML = HOUSES.map((h) => {
+  const n = h.patients, people = [];
+  const linked = Object.hasOwn(DETAILS, h.id), tag = linked ? "a" : "article", attr = linked ? ` href="house.html?id=${h.id}"` : ""; // houses added in the demo have no page
+  for (let i = 0; i < n; i++) { // evenly spaced on a circle, starting at the top
+    const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+    people.push(`<img class="pico" src="img/Person.png" alt="" style="left:${50 + 41 * Math.cos(a)}%;top:${50 + 41 * Math.sin(a)}%">`);
+  }
+  return `<${tag} class="house"${attr}><div class="ring" aria-hidden="true"><img class="hico" src="img/home.png" alt="">${people.join("")}</div>
+    <h2>${esc(houseName(h))}</h2><div class="meta">${t("patientsN", { n })}${h.staff ? ", " + t("staffN", { n: h.staff }) : ""}</div></${tag}>`;
+}).join("");
+}
+renderHouses();
+
+// Latest news: the five most recent events. The first five are samples; the buttons above add new ones on top.
+const hn = (id) => houseName(HOUSES.find((h) => h.id === id));
+const removalDate = fmtDate(iso(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 1))); // a removal takes effect on the 1st of next month
+const NEWS = [
+  { type: "document", text: t("newsDoc", { h: hn("house-3"), who: "Juan Perez" }), age: 25 },
+  { type: "pending", text: t("newsCall", { who: "Dania", date: fmtDate("2026-08-15") }), age: null },
+  { type: "followup", text: t("newsFollow", { h: hn("house-4") }), age: 120 },
+  { type: "staff", text: t("newsStaff", { h: hn("house-2"), who: "Laura Diaz" }), age: 1440 },
+  { type: "patient", text: t("newsRemoved", { h: hn("house-1"), date: removalDate }), age: 2880 },
+];
+const TAGS = { document: "tagDocument", pending: "tagPending", followup: "tagFollowup", staff: "tagStaff", patient: "tagPatient", house: "tagHouse" };
+function ago(minutes) { // age in minutes; null is a task with no timestamp
+  if (minutes === null) return t("thisWeek");
+  if (minutes < 1) return t("agoNow");
+  if (minutes < 60) return t(minutes === 1 ? "agoMin1" : "agoMinN", { n: minutes });
+  if (minutes < 1440) { const h = Math.round(minutes / 60); return t(h === 1 ? "agoHour1" : "agoHourN", { n: h }); }
+  const d = Math.round(minutes / 1440); return d === 1 ? t("yesterday") : t("agoDayN", { n: d });
+}
+function renderNews() {
+  document.getElementById("news").innerHTML = NEWS.map((n) =>
+    `<li class="news-item ${n.type}"><span class="news-tag">${t(TAGS[n.type])}</span><span class="news-text">${esc(n.text)}</span><span class="news-time">${ago(n.age)}</span></li>`).join("");
+}
+function announce(type, msg) { toast(msg); NEWS.unshift({ type, text: msg, age: 0 }); NEWS.splice(5); renderNews(); }
+renderNews();
+
+// Simulated forms: changes live in memory only and disappear on reload.
+const dlg = document.getElementById("dlg"), dn = document.getElementById("dn"), dh = document.getElementById("dh"), de = document.getElementById("de");
+let mode = "";
+const TEXT = { house: ["addHouseT", "houseName", false], staff: ["addStaffT", "staffName", true], patient: ["addPatientT", "patientName", true] };
+function toast(msg) { document.getElementById("toast").textContent = msg + " " + t("notSaved"); }
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
+  mode = b.dataset.add; const [title, label, needHouse] = TEXT[mode];
+  document.getElementById("dt").textContent = t(title); document.getElementById("dnl").textContent = t(label);
+  document.getElementById("hw").hidden = !needHouse; de.textContent = ""; dn.value = "";
+  dh.innerHTML = HOUSES.map((h) => `<option value="${h.id}">${esc(houseName(h))}</option>`).join("");
+  dlg.showModal(); dn.focus();
+}));
+document.getElementById("dc").addEventListener("click", () => dlg.close());
+document.getElementById("df").addEventListener("submit", (e) => {
+  e.preventDefault(); const name = dn.value.trim(); if (!name) { de.textContent = t("enterName"); return; }
+  if (mode === "house") {
+    if (HOUSES.length >= 8) { de.textContent = t("max8"); return; }
+    HOUSES.push({ id: "house-" + (HOUSES.length + 1), name, patients: 0, attendance: 0, followUps: 0 }); announce("house", t("toastHouse", { n: name }));
+  } else {
+    const h = HOUSES.find((x) => x.id === dh.value);
+    if (mode === "patient") { if (h.patients >= 12) { de.textContent = t("full12", { h: houseName(h) }); return; } h.patients++; announce("patient", t("toastPatient", { h: houseName(h) })); }
+    else { h.staff = (h.staff || 0) + 1; announce("staff", t("toastStaff", { h: houseName(h) })); }
+  }
+  dlg.close(); renderHouses();
+});
+
+const log = document.getElementById("log");
+const say = (cls, text) => { const d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; };
+say("bot", t("chatHello"));
+function answer(q) {
+  q = q.toLowerCase();
+  const best = (k, dir) => HOUSES.reduce((a, b) => (dir * (b[k] - a[k]) > 0 ? b : a));
+  const list = (k) => HOUSES.map((h) => `${houseName(h)} ${h[k]}`).join(", ");
+  if (/attend|asist/.test(q)) { const h = best("attendance", 1), l = best("attendance", -1); return t("ansAtt", { h: houseName(h), p: h.attendance, l: houseName(l), lp: l.attendance }); }
+  if (/follow|seguim/.test(q)) return t("ansFu", { list: list("followUps") });
+  if (/patient|pacient|how many|cu[aá]nt|total/.test(q)) return t("ansPat", { t: HOUSES.reduce((s, h) => s + h.patients, 0), n: HOUSES.length, list: list("patients") });
+  return t("ansOther");
+}
+document.getElementById("f").addEventListener("submit", (e) => {
+  e.preventDefault(); const i = document.getElementById("q"), v = i.value.trim(); if (!v) return;
+  say("me", v); i.value = ""; setTimeout(() => say("bot", answer(v)), 350);
+});
+</script></body></html>

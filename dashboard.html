@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side"><main>
+  <h1 id="h"></h1>
+  <div class="grid" id="tiles"></div>
+  <h2 id="bd"></h2>
+  <table><thead><tr><th id="th1"></th><th id="th2"></th><th id="th3"></th><th class="hide-s" id="th4"></th></tr></thead><tbody id="days"></tbody></table>
+  <p class="note" id="ro"></p>
+</main>
+<script src="app.js"></script>
+<script>
+guard(); shell("attendance");
+const set = (id, k) => { document.getElementById(id).textContent = t(k); };
+set("h","sampleHouse"); set("bd","byDay"); set("th1","day"); set("th2","submissions"); set("th3","present"); set("th4","attendance"); set("ro","readOnly");
+const recs = THIS_MONTH(), today = iso(TODAY);
+const present = recs.filter((r) => r.present).length;
+const recent = iso(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - 5));
+const tile = (n, l) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+document.getElementById("tiles").innerHTML =
+  tile(PATIENTS.length, t("activePatients")) + tile(recs.filter((r) => r.date === today).length, t("subsToday")) +
+  tile(Math.round((present / recs.length) * 100) + "%", t("attMonth")) + tile(recs.filter((r) => r.followUp && r.date >= recent).length, t("followUps"));
+const byDay = {};
+recs.forEach((r) => { (byDay[r.date] ||= []).push(r); });
+document.getElementById("days").innerHTML = Object.keys(byDay).sort().reverse().map((d) => {
+  const p = byDay[d].filter((r) => r.present).length;
+  return `<tr class="link" onclick="location.href='day.html?d=${d}'"><td><a href="day.html?d=${d}">${d}</a></td><td>${byDay[d].length}</td><td>${p}</td><td class="hide-s">${Math.round((p / byDay[d].length) * 100)}%</td></tr>`;
+}).join("");
+</script></body></html>

@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side"><main>
+  <p class="crumbs" id="crumbs"></p>
+  <h1 id="h"></h1>
+  <ul class="list" id="list"></ul>
+  <p class="note" id="sf"></p>
+</main>
+<script src="app.js"></script>
+<script>
+guard(); shell("files");
+document.getElementById("h").textContent = t("files"); document.getElementById("sf").textContent = t("sampleFiles");
+const q = new URLSearchParams(location.search), m = q.get("m"), d = q.get("d"), hn = t("sampleHouse");
+const li = (href, left, right) => `<li><a href="${href}"><span>${left}</span><span class="note">${right || ""}</span></a></li>`;
+let crumbs = `<a href="files.html">${hn}</a>`, html = "";
+if (!m) {
+  for (let k = 0; k < 3; k++) { const dt = new Date(TODAY.getFullYear(), TODAY.getMonth() - k, 1); const key = dt.getFullYear() + "-" + pad(dt.getMonth() + 1); html += li("files.html?m=" + key, key, t("month")); }
+} else if (!d) {
+  crumbs += ` / ${m}`; const [y, mo] = m.split("-").map(Number);
+  const days = new Set(monthRecords(y, mo - 1).map((r) => r.date));
+  html = [...days].sort().reverse().map((x) => li(`files.html?m=${m}&d=${x}`, x, t("filesN", { n: PATIENTS.length }))).join("");
+} else {
+  crumbs += ` / <a href="files.html?m=${m}">${m}</a> / ${d}`;
+  html = PATIENTS.map((p, i) => `<li><div class="row"><span>${p.replace(/\W+/g, "-").replace(/-$/, "")}.xlsx</span><button class="secondary" onclick="download('sample-${i + 1}.txt','Sample placeholder for ${p.replace(/'/g, "")} on ${d}.\\nNot a real spreadsheet.')">${t("download")}</button></div></li>`).join("");
+}
+document.getElementById("crumbs").innerHTML = crumbs; document.getElementById("list").innerHTML = html;
+</script></body></html>

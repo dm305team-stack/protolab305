@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>Calendar | Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side home"><main>
+  <span class="pill" id="pl"></span>
+  <h1 id="h1"></h1>
+  <div class="cal-bar">
+    <div class="cal-nav" role="group"><button type="button" id="prev">&lsaquo;</button><button type="button" id="todayb"></button><button type="button" id="next">&rsaquo;</button></div>
+    <h2 id="month" aria-live="polite"></h2>
+    <ul class="cal-legend" id="legend"></ul>
+  </div>
+  <div class="cal-layout" id="cal">
+    <section class="cal-card"><table class="cal" id="grid"></table></section>
+    <div class="cal-side">
+      <section class="card" aria-labelledby="ag-title"><h2 id="ag-title"></h2><ul class="ag-list" id="agenda"></ul></section>
+      <section class="card" aria-labelledby="up-title"><h2 id="up-title"></h2><ul class="ag-list" id="upcoming"></ul></section>
+    </div>
+  </div>
+  <p class="note" id="sample"></p>
+</main>
+<script src="app.js"></script>
+<script>
+guard(); shell("calendar");
+(function () {
+  const set = (id, k) => { document.getElementById(id).textContent = t(k); };
+  set("pl", "calPill"); set("h1", "calTitle"); set("todayb", "calToday"); set("up-title", "calUpcoming"); set("sample", "calSample");
+  document.getElementById("prev").setAttribute("aria-label", t("calPrev"));
+  document.getElementById("next").setAttribute("aria-label", t("calNext"));
+  document.getElementById("legend").setAttribute("aria-label", t("calLegend"));
+
+  const L = LANG === "es" ? "es-ES" : "en-US", startDay = LANG === "es" ? 1 : 0; // weeks start on Monday in Spanish, Sunday in English
+  const fmt = (o) => new Intl.DateTimeFormat(L, o);
+  const fMonth = fmt({ month: "long", year: "numeric" }), fLong = fmt({ weekday: "long", month: "long", day: "numeric" });
+  const fShort = fmt({ weekday: "short", month: "short", day: "numeric" }), fTime = fmt({ hour: "numeric", minute: "2-digit" }), fWd = fmt({ weekday: "short" });
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const timeLabel = (hhmm) => { if (!hhmm) return t("calAllDay"); const [h, m] = hhmm.split(":").map(Number); return fTime.format(new Date(2000, 0, 1, h, m)); };
+  const hn = (id) => houseName(HOUSES.find((h) => h.id === id));
+  const today = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()), todayIso = iso(today);
+  const TYPES = { visit: "calTagVisit", task: "tagPending", followup: "tagFollowup", license: "calTagLicense", review: "calTagReview" };
+  const HOUSE_IDS = ["house-1", "house-2", "house-3", "house-4"];
+
+  // --- sample events: a few tied to today's date, the rest follow a monthly pattern ------------------
+  const monday = addDays(today, -((today.getDay() + 6) % 7)), friday = addDays(monday, 4);
+  const license = (offset, id, i) => { const m = DETAILS[id].team[i]; return { date: iso(addDays(today, offset)), time: null, type: "license", short: m.name, text: t("calLicense", { who: m.name, lic: m.license }) }; };
+  const FIXED = [
+    { date: iso(friday < today ? today : friday), time: "10:00", type: "task", short: t("calCallShort", { who: "Dania" }), text: t("calCall", { who: "Dania" }) },
+    { date: iso(addDays(today, 1)), time: "14:00", type: "followup", short: t("tagFollowup"), text: t("calFollow", { h: hn("house-4") }) },
+    license(8, "house-1", 0), license(16, "house-3", 2), license(26, "house-4", 1), // the three renewals counted on the home
+  ];
+  const byTime = (a, b) => (a.time || "00:00").localeCompare(b.time || "00:00");
+  const cache = {};
+  function monthEvents(y, m) { // events of one month, by date
+    const key = y + "-" + m;
+    if (cache[key]) return cache[key];
+    const out = {}, push = (e) => { (out[e.date] ||= []).push(e); };
+    for (let day = 1, n = new Date(y, m + 1, 0).getDate(); day <= n; day++) {
+      const d = new Date(y, m, day);
+      if (d.getDay() === 1) { // a visit every Monday, rotating through the houses
+        const week = Math.floor(Date.UTC(y, m, day) / 604800000);
+        const house = hn(HOUSE_IDS[week % HOUSE_IDS.length]);
+        push({ date: iso(d), time: "10:00", type: "visit", short: house, text: t("calVisit", { h: house }) });
+      }
+    }
+    let last = new Date(y, m + 1, 0); // monthly documentation review on the last weekday
+    while (last.getDay() === 0 || last.getDay() === 6) last = addDays(last, -1);
+    push({ date: iso(last), time: "15:00", type: "review", short: t("calTagReview"), text: t("calReview") });
+    FIXED.filter((e) => e.date.startsWith(y + "-" + pad(m + 1))).forEach(push);
+    Object.values(out).forEach((list) => list.sort(byTime));
+    return (cache[key] = out);
+  }
+  const eventsOn = (id) => { const d = parse(id); return monthEvents(d.getFullYear(), d.getMonth())[id] || []; };
+
+  // --- views --------------------------------------------------------------------------------------------
+  let view = new Date(today.getFullYear(), today.getMonth(), 1), selected = todayIso;
+  const count = (n) => (n === 1 ? t("calEvents1") : t("calEventsN", { n }));
+
+  function renderGrid() {
+    const y = view.getFullYear(), m = view.getMonth(), title = cap(fMonth.format(view));
+    document.getElementById("month").textContent = title;
+    const heads = Array.from({ length: 7 }, (_, k) => `<th scope="col">${esc(cap(fWd.format(new Date(2024, 0, 7 + ((startDay + k) % 7)))))}</th>`).join("");
+    const first = new Date(y, m, 1), lead = (first.getDay() - startDay + 7) % 7, start = addDays(first, -lead);
+    const weeks = Math.ceil((lead + new Date(y, m + 1, 0).getDate()) / 7);
+    let rows = "";
+    for (let w = 0; w < weeks; w++) {
+      let cells = "";
+      for (let k = 0; k < 7; k++) {
+        const d = addDays(start, w * 7 + k), id = iso(d), evs = eventsOn(id);
+        const chips = evs.slice(0, 3).map((e) => `<span class="ev-chip t-${e.type}"><i></i><span>${esc(e.short)}</span></span>`).join("");
+        const more = evs.length > 3 ? `<span class="ev-more">${t("calMore", { n: evs.length - 3 })}</span>` : "";
+        const cls = ["cal-day", d.getMonth() === m ? "" : "out", id < todayIso ? "past" : "", id === todayIso ? "today" : ""].filter(Boolean).join(" ");
+        cells += `<td><button type="button" class="${cls}" data-day="${id}" aria-pressed="${id === selected}"${id === todayIso ? ' aria-current="date"' : ""} aria-label="${esc(cap(fLong.format(d)))}, ${count(evs.length)}"><span class="num">${d.getDate()}</span><span class="ev-chips">${chips}${more}</span></button></td>`;
+      }
+      rows += `<tr>${cells}</tr>`;
+    }
+    document.getElementById("grid").innerHTML = `<caption class="sr-only">${esc(t("calGrid", { m: fMonth.format(view) }))}</caption><thead><tr>${heads}</tr></thead><tbody>${rows}</tbody>`;
+  }
+  const itemBody = (e, when) => `<span class="ag-meta"><span class="ag-tag">${t(TYPES[e.type])}</span><span class="ag-time">${esc(when)}</span></span><span class="ag-text">${esc(e.text)}</span>`;
+  function renderAgenda() {
+    const evs = eventsOn(selected);
+    document.getElementById("ag-title").textContent = cap(fLong.format(parse(selected)));
+    document.getElementById("agenda").innerHTML = evs.length
+      ? evs.map((e) => `<li class="ag-item t-${e.type}">${itemBody(e, timeLabel(e.time))}</li>`).join("")
+      : `<li class="note">${t("calNone")}</li>`;
+  }
+  function renderUpcoming() { // every event in the 30 days after today (capped at 12), soonest first
+    const list = [];
+    for (let n = 1; n <= 30 && list.length < 12; n++) eventsOn(iso(addDays(today, n))).forEach((e) => list.push(e));
+    document.getElementById("upcoming").innerHTML = list.length
+      ? list.slice(0, 12).map((e) => `<li><button type="button" class="ag-item t-${e.type}" data-day="${e.date}">${itemBody(e, fShort.format(parse(e.date)) + (e.time ? " · " + timeLabel(e.time) : ""))}</button></li>`).join("")
+      : `<li class="note">${t("calUpNone")}</li>`;
+  }
+  function select(id, focus) {
+    selected = id;
+    const d = parse(id);
+    if (d.getFullYear() !== view.getFullYear() || d.getMonth() !== view.getMonth()) view = new Date(d.getFullYear(), d.getMonth(), 1);
+    renderGrid(); renderAgenda();
+    if (focus) { const b = document.querySelector(`#grid [data-day="${id}"]`); if (b) b.focus(); }
+  }
+  function goMonth(delta) { // keep a sensible selection: today if it is in that month, else the 1st
+    view = new Date(view.getFullYear(), view.getMonth() + delta, 1);
+    const inMonth = view.getFullYear() === today.getFullYear() && view.getMonth() === today.getMonth();
+    selected = inMonth ? todayIso : iso(view);
+    renderGrid(); renderAgenda();
+  }
+
+  document.getElementById("legend").innerHTML = Object.keys(TYPES).map((k) => `<li class="t-${k}">${t(TYPES[k])}</li>`).join("");
+  document.getElementById("prev").addEventListener("click", () => goMonth(-1));
+  document.getElementById("next").addEventListener("click", () => goMonth(1));
+  document.getElementById("todayb").addEventListener("click", () => { view = new Date(today.getFullYear(), today.getMonth(), 1); select(todayIso, false); });
+  document.getElementById("cal").addEventListener("click", (e) => { const b = e.target.closest("[data-day]"); if (b) select(b.dataset.day, true); });
+  renderGrid(); renderAgenda(); renderUpcoming();
+})();
+</script></body></html>

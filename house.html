@@ -1,0 +1,177 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><link rel="icon" type="image/png" href="img/home.png"><title>House | Houses Demo</title><link rel="stylesheet" href="style.css"></head>
+<body class="has-side home"><main id="page"></main>
+<script src="app.js"></script>
+<script>
+guard(); shell("home");
+(function () {
+  const page = document.getElementById("page");
+  const id = new URLSearchParams(location.search).get("id");
+  const house = HOUSES.find((h) => h.id === id), info = Object.hasOwn(DETAILS, id) ? DETAILS[id] : null;
+  if (!house || !info) {
+    page.innerHTML = `<h1>${t("notFound")}</h1><p><a href="home.html">${t("backHome")}</a></p>`;
+    return;
+  }
+  const name = houseName(house), names = info.patients;
+  document.title = name + " | Houses Demo";
+  const occupied = names.length, free = info.beds - occupied, pct = Math.round((occupied / info.beds) * 100);
+  const initials = (n) => n.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  // --- icons ---------------------------------------------------------------------------------
+  const ICON_FOLDER = `<svg viewBox="0 0 64 64" width="28" height="28" fill="none" stroke-linejoin="round" aria-hidden="true"><path d="M6 17a4 4 0 0 1 4-4h14l6 7h24a4 4 0 0 1 4 4v25a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="rgba(255,106,19,.18)" stroke="#ff7a2e" stroke-width="3.5"/></svg>`;
+  const ICON_FILE = `<svg viewBox="0 0 64 64" width="28" height="28" fill="none" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M16 6h22l12 12v36a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4Z" stroke="#c9ced6" stroke-width="3.5"/><path d="M38 6v12h12" stroke="#c9ced6" stroke-width="3.5"/><path d="M22 34h20M22 42h20M22 50h12" stroke="#7a828e" stroke-width="3.5"/></svg>`;
+  const ICON_TARGET = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg>`;
+
+  // --- sample map: blocks, a park, a river, and a pin on the house. No outside requests. ---------
+  function mapSvg(i) {
+    const ex = [0, 70, 150, 250, 330, 400], ey = [0, 50, 100, 160, 212, 240]; // street centre lines
+    let blocks = "";
+    for (let a = 0; a < ex.length - 1; a++) {
+      for (let b = 0; b < ey.length - 1; b++) {
+        const x0 = ex[a] + (a === 0 ? 0 : 7), x1 = ex[a + 1] - (a === ex.length - 2 ? 0 : 7);
+        const y0 = ey[b] + (b === 0 ? 0 : 7), y1 = ey[b + 1] - (b === ey.length - 2 ? 0 : 7);
+        const fill = b === ey.length - 2 ? "#0f2438" : a === 1 && b === 3 ? "#13301f" : "#171b21"; // river, park, block
+        blocks += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="${b === ey.length - 2 ? 0 : 5}" fill="${fill}"/>`;
+        if (fill === "#171b21") {
+          const w = x1 - x0, hh = y1 - y0;
+          blocks += `<rect x="${(x0 + w * 0.08).toFixed(1)}" y="${(y0 + hh * 0.12).toFixed(1)}" width="${(w * 0.38).toFixed(1)}" height="${(hh * 0.5).toFixed(1)}" rx="2" fill="#1d222a"/><rect x="${(x0 + w * 0.56).toFixed(1)}" y="${(y0 + hh * 0.38).toFixed(1)}" width="${(w * 0.34).toFixed(1)}" height="${(hh * 0.48).toFixed(1)}" rx="2" fill="#1d222a"/>`;
+        }
+      }
+    }
+    const trees = [[92, 182], [112, 190], [128, 178]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#1d4a2e"/>`).join("");
+    const [x, y] = i.pin;
+    return `<svg class="mapsvg" viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+      <rect width="400" height="240" fill="#232830"/>${blocks}${trees}
+      <text x="262" y="103" font-size="8" fill="#9aa3af" font-family="system-ui,sans-serif">${esc(i.street)}</text>
+      <circle class="pulse" cx="${x}" cy="${y}" r="8" fill="none" stroke="#ff6a13" stroke-width="2"/>
+      <g transform="translate(${x},${y})"><path d="M0 0 L-9 -17 A15 15 0 1 1 9 -17 Z" fill="#ff6a13"/><circle cx="0" cy="-29" r="6" fill="#fff"/></g></svg>`;
+  }
+
+  // --- page ----------------------------------------------------------------------------------------
+  const people = names.map((p, i) => {
+    const a = (i / occupied) * 2 * Math.PI - Math.PI / 2;
+    return `<figure class="pfig" style="left:${(50 + 38 * Math.cos(a)).toFixed(2)}%;top:${(50 + 38 * Math.sin(a)).toFixed(2)}%"><img src="img/Person.png" alt=""><figcaption>${esc(p)}</figcaption></figure>`;
+  }).join("");
+  const team = info.team.map((m) => `<li class="staff-card"><span class="avatar" aria-hidden="true">${esc(initials(m.name))}</span><div><div class="s-name">${esc(m.name)}</div><div class="note">${t("license")}: ${esc(m.license)}</div></div></li>`).join("");
+
+  page.innerHTML = `
+    <p class="crumbs"><a href="home.html">${t("home")}</a> / <span>${esc(name)}</span></p>
+    <span class="pill">${t("houseT")}</span>
+    <h1>${esc(name)}</h1>
+
+    <section class="tile beds" aria-label="${t("bedsTitle")}">
+      <div><div class="n">${occupied} / ${info.beds}</div><div class="l">${t("bedsOccupied")}${free === 0 ? ` <span class="pill">${t("full")}</span>` : ""}</div></div>
+      <div class="bar" role="progressbar" aria-label="${t("bedsOccupied")}" aria-valuemin="0" aria-valuemax="${info.beds}" aria-valuenow="${occupied}"><span style="width:${pct}%"></span></div>
+      <div class="beds-side"><div><b>${info.beds}</b><span class="l">${t("bedsCapacity")}</span></div><div><b>${occupied}</b><span class="l">${t("bedsOccupiedL")}</span></div><div><b>${free}</b><span class="l">${t("bedsFree")}</span></div></div>
+    </section>
+
+    <div class="house-grid">
+      <section class="card ring-card" aria-labelledby="pt">
+        <h2 id="pt">${t("patientsTitle")} (${occupied})</h2>
+        <div class="ring big" role="group" aria-labelledby="pt"><img class="hico" src="img/home.png" alt="">${people}</div>
+      </section>
+      <section class="card info-card" aria-labelledby="lt">
+        <h2 id="lt">${t("locTitle")}</h2>
+        <address>${esc(info.street)}<br>${esc(info.city)}</address>
+        <p class="phone"><span class="note">${t("phone")}</span> <a href="tel:${esc(info.tel)}">${esc(info.phone)}</a></p>
+        <div class="map"><div class="map-view" role="img" aria-label="${t("mapAlt")}">${mapSvg(info)}</div>
+          <div class="map-tools"><button type="button" id="zin" aria-label="${t("zoomIn")}">+</button><button type="button" id="zout" aria-label="${t("zoomOut")}">&minus;</button><button type="button" id="zreset" aria-label="${t("zoomReset")}">${ICON_TARGET}</button></div>
+        </div>
+        <p class="note">${t("mapNote")}</p>
+      </section>
+    </div>
+
+    <section class="staff" aria-labelledby="st"><h2 id="st">${t("staffTitle")}</h2><ul class="staff-list">${team}</ul></section>
+
+    <section class="docs" id="docs" aria-labelledby="dt"><h2 id="dt">${t("docsTitle")}</h2>
+      <div class="seg" id="seg" role="group" aria-label="${t("folderPath")}"></div>
+      <div class="vgrid" id="vgrid"></div>
+      <p class="note">${t("sampleFiles")}</p>
+    </section>`;
+
+  // --- map zoom: + and - change the view, the target button centres it on the house -------------
+  const svg = page.querySelector(".mapsvg"), zin = document.getElementById("zin"), zout = document.getElementById("zout");
+  let zoom = 1;
+  function setZoom(z) {
+    zoom = Math.min(3, Math.max(1, z));
+    const w = 400 / zoom, h = 240 / zoom, [px, py] = info.pin;
+    const x = Math.min(400 - w, Math.max(0, px - w / 2)), y = Math.min(240 - h, Math.max(0, py - 20 - h / 2));
+    svg.setAttribute("viewBox", `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+    zin.disabled = zoom >= 3; zout.disabled = zoom <= 1;
+  }
+  zin.addEventListener("click", () => setZoom(zoom * 1.5));
+  zout.addEventListener("click", () => setZoom(zoom / 1.5));
+  document.getElementById("zreset").addEventListener("click", () => setZoom(1));
+  setZoom(1);
+
+  // --- visual folders: house / month / day / patient file, as in the Drive layout ------------------
+  const cache = {};
+  function byDay(key) { // "YYYY-MM" -> { "YYYY-MM-DD": [records in patient order] }
+    if (!cache[key]) {
+      const [y, mo] = key.split("-").map(Number), out = {};
+      monthRecords(y, mo - 1, names, info.salt).forEach((r) => { (out[r.date] ||= []).push(r); });
+      cache[key] = out;
+    }
+    return cache[key];
+  }
+  const months = [0, 1, 2].map((k) => { const d = new Date(TODAY.getFullYear(), TODAY.getMonth() - k, 1); return d.getFullYear() + "-" + pad(d.getMonth() + 1); });
+  const hhmm = (s) => { const [h, m] = s.split(":").map(Number); return h + m / 60; };
+
+  function spark(rates) { // line over the days of the month; the range is stretched so the ups and downs show
+    if (rates.length < 2) return `<svg viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path class="spark" vector-effect="non-scaling-stroke" d="M0 12 L100 12"/></svg>`;
+    const lo = Math.min(0.5, ...rates);
+    const pts = rates.map((r, i) => `${((i / (rates.length - 1)) * 100).toFixed(1)} ${(22 - ((r - lo) / (1 - lo)) * 18).toFixed(1)}`);
+    return `<svg viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path class="spark" vector-effect="non-scaling-stroke" d="M${pts.join(" L")}"/></svg>`;
+  }
+  function card(o) {
+    const attr = o.file ? `data-file="${esc(o.file)}" data-patient="${esc(o.patient)}" data-day="${esc(o.day)}"` : `data-open="${esc(o.open)}"`;
+    return `<button type="button" class="vcard" ${attr}>
+      <span class="vc-head"><span class="vc-title">${esc(o.title)}</span><span class="vc-tag">${esc(o.tag)}</span></span>
+      <span class="vc-body"><span class="vc-icon">${o.icon}</span><span class="vc-metric"><b${o.cls ? ` class="${o.cls}"` : ""}>${esc(o.metric)}</b><small>${esc(o.range)}</small></span></span>
+      <span class="vc-viz">${o.viz}</span>${o.cta ? `<span class="vc-cta">${esc(o.cta)}</span>` : ""}</button>`;
+  }
+  function monthCard(key) {
+    const days = Object.keys(byDay(key)).sort(), all = days.map((d) => byDay(key)[d]);
+    const files = all.reduce((s, r) => s + r.length, 0), present = all.reduce((s, r) => s + r.filter((x) => x.present).length, 0);
+    const a = Number(days[0].slice(8)), b = Number(days[days.length - 1].slice(8));
+    return card({ open: key, title: key, tag: Math.round((present / files) * 100) + "%", icon: ICON_FOLDER, metric: `${files} ${t("vFiles")}`,
+      range: a === b ? t("vDay1", { a }) : t("vDays", { a, b }), viz: spark(all.map((r) => r.filter((x) => x.present).length / r.length)) });
+  }
+  function dayCard(key, day) {
+    const recs = byDay(key)[day], p = recs.filter((r) => r.present).length;
+    return card({ open: day, title: day, tag: `${p}/${recs.length}`, icon: ICON_FOLDER, metric: `${recs.length} ${t("vFiles")}`,
+      range: t("vPresentOf", { p, n: recs.length }), viz: `<span class="dots">${recs.map((r) => `<i class="${r.present ? "" : "off"}"></i>`).join("")}</span>` });
+  }
+  function fileCard(r) {
+    const file = r.patient.replace(/\W+/g, "-").replace(/-$/, "") + ".xlsx";
+    const bar = r.present
+      ? `<span class="tl"><i style="left:${((hhmm(r.timeIn) - 6) / 14 * 100).toFixed(1)}%;width:${((hhmm(r.timeOut) - hhmm(r.timeIn)) / 14 * 100).toFixed(1)}%"></i></span>`
+      : `<span class="tl"></span>`;
+    return card({ file, patient: r.patient, day: r.date, title: file, tag: "XLSX", icon: ICON_FILE, cls: r.present ? "yes" : "no",
+      metric: r.present ? t("vHere") : t("vAbsent"), range: r.present ? t("vHours", { a: r.timeIn, b: r.timeOut }) : "-", viz: bar, cta: t("download") });
+  }
+
+  let path = []; // [] = months, [month] = days, [month, day] = files
+  function render() {
+    const seg = [[0, name]];
+    if (path.length > 0) seg.push([1, path[0]]);
+    if (path.length > 1) seg.push([2, path[1]]);
+    document.getElementById("seg").innerHTML = seg.map(([n, label]) => {
+      const here = n === path.length;
+      return `<button type="button" data-go="${n}"${here ? ' class="on" aria-current="true"' : ""}>${esc(label)}</button>`;
+    }).join("");
+    let cards;
+    if (path.length === 0) cards = months.map(monthCard);
+    else if (path.length === 1) cards = Object.keys(byDay(path[0])).sort().reverse().map((d) => dayCard(path[0], d));
+    else cards = byDay(path[0])[path[1]].map(fileCard);
+    document.getElementById("vgrid").innerHTML = cards.join("");
+  }
+  const focusFirst = () => { const c = document.querySelector("#vgrid .vcard"); if (c) c.focus(); };
+  document.getElementById("docs").addEventListener("click", (e) => {
+    const open = e.target.closest("[data-open]"), go = e.target.closest("[data-go]"), file = e.target.closest("[data-file]");
+    if (open) { path.push(open.dataset.open); render(); focusFirst(); }
+    else if (go) { const n = Number(go.dataset.go); if (n < path.length) { path = path.slice(0, n); render(); focusFirst(); } }
+    else if (file) { download(file.dataset.file.replace(/\.xlsx$/, "") + "-sample.txt", `Sample placeholder for ${file.dataset.patient} on ${file.dataset.day}.\nNot a real spreadsheet.`); }
+  });
+  render();
+})();
+</script></body></html>
