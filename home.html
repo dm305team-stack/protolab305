@@ -70,7 +70,7 @@ const hn = (id) => houseName(HOUSES.find((h) => h.id === id));
 const removalDate = fmtDate(iso(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 1))); // a removal takes effect on the 1st of next month
 const NEWS = [
   { type: "document", text: t("newsDoc", { h: hn("house-3"), who: "Juan Perez" }), age: 25 },
-  { type: "pending", text: t("newsCall", { who: "Dania", date: fmtDate("2026-08-15") }), age: null },
+  { type: "pending", text: t("newsCall", { who: "Dania", date: fmtDate("2026-11-15") }), age: null },
   { type: "followup", text: t("newsFollow", { h: hn("house-4") }), age: 120 },
   { type: "staff", text: t("newsStaff", { h: hn("house-2"), who: "Laura Diaz" }), age: 1440 },
   { type: "patient", text: t("newsRemoved", { h: hn("house-1"), date: removalDate }), age: 2880 },
