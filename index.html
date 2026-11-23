@@ -13,15 +13,21 @@
     <button type="submit" id="bs"></button>
   </form>
   <p class="note" id="ln"></p>
-  <p class="note"><a href="#" id="sw"></a></p>
 </main>
+<section class="about" aria-labelledby="at">
+  <h2 id="at"></h2>
+  <p id="a1"></p><p id="a2"></p><p id="a3"></p>
+</section>
+<button type="button" class="lang-fab" id="sw"></button>
 <script src="app.js"></script>
 <script>
 const set = (id, k) => { document.getElementById(id).textContent = t(k); };
 document.title = t("signIn") + " | Houses Demo";
 set("bn","banner"); set("h1","brand"); set("lu","username"); set("lp","password"); set("bc","cont"); set("ci","codeIntro"); set("lc","code"); set("bs","signIn"); set("ln","loginNote");
-document.getElementById("sw").textContent = LANG === "en" ? "Español" : "English";
-document.getElementById("sw").addEventListener("click", (e) => { e.preventDefault(); setLang(LANG === "en" ? "es" : "en"); });
+set("at","aboutTitle"); set("a1","aboutP1"); set("a2","aboutP2"); set("a3","aboutP3");
+const sw = document.getElementById("sw"); // fixed bottom-left; shows the language you can switch to
+sw.textContent = LANG === "en" ? "Español" : "English"; sw.lang = LANG === "en" ? "es" : "en";
+sw.addEventListener("click", () => setLang(LANG === "en" ? "es" : "en"));
 document.getElementById("pw").addEventListener("submit", (e) => { e.preventDefault(); e.target.hidden = true; document.getElementById("code").hidden = false; document.getElementById("c").focus(); });
 document.getElementById("code").addEventListener("submit", (e) => { e.preventDefault(); try { sessionStorage.setItem("demo-signed-in", "1"); } catch (err) {} location.href = "home.html"; });
 </script></body></html>

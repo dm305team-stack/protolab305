@@ -29,6 +29,10 @@ select option { background:var(--card-solid); color:var(--fg); }
 button, .btn { display:inline-block; min-height:2.75rem; margin-top:1.25rem; padding:.5rem 1.1rem; font:inherit; font-weight:600; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent-2)); border:0; border-radius:.5rem; cursor:pointer; text-decoration:none; }
 button.secondary { color:var(--fg); background:transparent; border:1px solid var(--border); margin:0; }
 .login { max-width:24rem; margin:2rem auto; } .login button { width:100%; }
+.about { width:calc(100% - 2rem); max-width:34rem; margin:0 auto 5.5rem; padding:.25rem 1.25rem 1rem; background:var(--card); border:1px solid var(--border); border-radius:.75rem; }
+.about h2 { margin-top:1rem; } .about p { margin:.6rem 0; color:#d4d4d8; }
+.lang-fab { position:fixed; left:1rem; bottom:calc(1rem + env(safe-area-inset-bottom)); z-index:30; margin:0; padding:.5rem 1rem; color:var(--fg); background:var(--card-solid); border:1px solid var(--border); box-shadow:0 4px 14px rgba(0,0,0,.45); }
+.lang-fab:hover { border-color:rgba(255,106,19,.7); }
 .crumbs { color:var(--muted); font-size:.9rem; } .crumbs a { color:var(--muted); }
 .note { color:var(--muted); font-size:.875rem; }
 .list { list-style:none; margin:0; padding:0; } .list li { border-bottom:1px solid var(--border); }
